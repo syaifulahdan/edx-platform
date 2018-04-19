@@ -1,0 +1,1 @@
+PASSWORD_POLICY_COMPLIANT_USERS_GROUP_NAME = 'pp.compliant.users'

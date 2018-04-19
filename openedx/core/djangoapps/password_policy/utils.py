@@ -4,9 +4,11 @@ from dateutil.parser import parse as parse_date
 
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth.models import Group
 from django.utils.translation import ugettext as _
 
 from openedx.core.djangoapps.util.user_messages import PageLevelMessages, UserMessageType
+from openedx.core.djangoapps.password_policy.constants import PASSWORD_POLICY_COMPLIANT_USERS_GROUP_NAME
 from util.date_utils import strftime_localized, DEFAULT_SHORT_DATE_FORMAT
 from util.password_policy_validators import ValidationError, validate_password
 
@@ -20,8 +22,13 @@ def check_password_policy_compliance(user, password, request=None):
     if not (config and config.get('ENABLE_COMPLIANCE_CHECKING', False)):
         return
 
+    # If the user is already known to be compliant, return.
+    if user.groups.filter(name=PASSWORD_POLICY_COMPLIANT_USERS_GROUP_NAME).exists():
+        return
+
     is_compliant = is_password_compliant(user, password)
     if is_compliant:
+        user.groups.add(Group.objects.get(name=PASSWORD_POLICY_COMPLIANT_USERS_GROUP_NAME))
         return
 
     deadline = get_enforcement_deadline_for_user(config, user)
