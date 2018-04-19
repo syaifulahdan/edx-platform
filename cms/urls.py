@@ -17,6 +17,11 @@ django_autodiscover()
 admin.site.site_header = _('Studio Administration')
 admin.site.site_title = admin.site.site_header
 
+if settings.PASSWORD_POLICY_COMPLIANCE_ROLLOUT_CONFIG.get('ENABLE_COMPLIANCE_CHECKING', False):
+    from openedx.core.djangoapps.password_policy.forms import PasswordPolicyAwareAdminAuthForm
+    admin.site.login_form = PasswordPolicyAwareAdminAuthForm
+
+
 # Pattern to match a course key or a library key
 COURSELIKE_KEY_PATTERN = r'(?P<course_key_string>({}|{}))'.format(
     r'[^/]+/[^/]+/[^/]+', r'[^/:]+:[^/+]+\+[^/+]+(\+[^/]+)?'

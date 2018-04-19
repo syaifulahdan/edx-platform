@@ -55,6 +55,10 @@ if settings.DEBUG or settings.FEATURES.get('ENABLE_DJANGO_ADMIN_SITE'):
     admin.site.site_header = _('LMS Administration')
     admin.site.site_title = admin.site.site_header
 
+    if settings.PASSWORD_POLICY_COMPLIANCE_ROLLOUT_CONFIG.get('ENABLE_COMPLIANCE_CHECKING', False):
+        from openedx.core.djangoapps.password_policy.forms import PasswordPolicyAwareAdminAuthForm
+        admin.site.login_form = PasswordPolicyAwareAdminAuthForm
+
 
 urlpatterns = [
     url(r'^$', branding_views.index, name='root'),   # Main marketing page, or redirect to courseware
