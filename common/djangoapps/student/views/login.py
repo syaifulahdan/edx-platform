@@ -44,6 +44,10 @@ from edxmako.shortcuts import render_to_response, render_to_string
 from eventtracking import tracker
 from openedx.core.djangoapps.external_auth.login_and_register import login as external_auth_login
 from openedx.core.djangoapps.external_auth.models import ExternalAuthMap
+from openedx.core.djangoapps.password_policy.utils import (
+    NonCompliantPasswordException,
+    check_password_policy_compliance
+)
 from openedx.core.djangoapps.site_configuration import helpers as configuration_helpers
 from openedx.core.djangoapps.user_api.accounts.utils import generate_password
 from openedx.features.course_experience import course_home_url_name
@@ -188,6 +192,15 @@ def _check_forced_password_reset(user):
     """
     if user and PasswordHistory.should_user_reset_password_now(user):
         raise AuthFailedError(_('Your password has expired due to password policy on this account. You must '
+                                'reset your password before you can log in again. Please click the '
+                                '"Forgot Password" link on this page to reset your password before logging in again.'))
+
+
+def _check_password_policy_compliance(request, user):
+    try:
+        check_password_policy_compliance(user, request.POST.get('password'), request=request)
+    except NonCompliantPasswordException:
+        raise AuthFailedError(_('Your password is not compliant with the current password policy. You must '
                                 'reset your password before you can log in again. Please click the '
                                 '"Forgot Password" link on this page to reset your password before logging in again.'))
 
@@ -448,6 +461,8 @@ def login_user(request):
 
         if not was_authenticated_third_party:
             possibly_authenticated_user = _authenticate_first_party(request, email_user)
+            if possibly_authenticated_user:
+                _check_password_policy_compliance(request, possibly_authenticated_user)
 
         if possibly_authenticated_user is None or not possibly_authenticated_user.is_active:
             _handle_failed_authentication(email_user)
