@@ -4,7 +4,7 @@ from ..data_retirement_utils import delete_oauth2_data_by_user_value
 
 
 class TestDataRetirementUtils(TestCase):
-    
+
     def setUp(self):
         pass
 
