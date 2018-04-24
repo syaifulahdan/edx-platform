@@ -1,7 +1,7 @@
 from uuid import uuid4
 
-from oauth2_provider.models import AccessToken, Application, Grant, RefreshToken
-from provider.oauth2.tests import BaseOAuth2TestCase
+from django.test import TestCase
+from oauth2_provider.models import AccessToken, Application, Client, Grant, RefreshToken
 from student.tests.factories import UserFactory
 
 from ..data_retirement_utils import (
@@ -14,13 +14,13 @@ from ..data_retirement_utils import (
 )
 
 
-class TestRetireUserFromOauth2AccessToken(BaseOAuth2TestCase):
+class TestRetireUserFromOauth2AccessToken(TestCase):
 
     def setUp(self):
         super(TestRetireUserFromOauth2AccessToken, self).setUp()
+        self.user = UserFactory.create()
+        self.client = Client.objects.create()
 
     def test_delete_from_oauth2_accesstoken(self):
-        user = self.get_user()
-        client = self.get_client()
-        token = AccessToken.objects.create(user=user, client=client)
+        token = AccessToken.objects.create(user=self.user, client=self.client)
         self.assertTrue(delete_from_oauth2_accesstoken(user))
