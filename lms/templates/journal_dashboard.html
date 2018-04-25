@@ -120,11 +120,14 @@ banner.showMessage(${redirect_message | n, dump_js_escaped_json})
                     <h3 class="course-title" id="course-title-${journal['uuid']}" href="${journal['url']}">
                       <a data-course-key="${journal['uuid']}">${journal['journal']['name']}</a>
                     </h3>
-                  </div>
-                  <div class="course-info">
-                    <span class="info-university">${journal['journal']['organization']}</span>
-                    <!--TODO: handle case where user used to have acces to a course and no longer does -->
-                    
+                    <div class="course-info">
+                      <span class="info-university">${journal['journal']['organization']}</span>
+                      <!--TODO: handle case where user used to have access to a course and no longer does -->
+                      <span class="info-date-block-container">
+                      <!--TODO: i18n concerns? -->
+                      <span class="info-date-block">${_('Access Expires - {date}').format(date=journal['expiration_date'])}</span>
+                    </span>
+                    </div>
                   </div>
                 </section>
               </article>
