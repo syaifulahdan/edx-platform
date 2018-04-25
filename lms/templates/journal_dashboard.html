@@ -7,6 +7,7 @@ import pytz
 from datetime import datetime, timedelta
 from django.core.urlresolvers import reverse
 from django.utils.translation import ugettext as _
+from django.utils.translation import ungettext
 from django.template import RequestContext
 from entitlements.models import CourseEntitlement
 from third_party_auth import pipeline
@@ -124,9 +125,9 @@ banner.showMessage(${redirect_message | n, dump_js_escaped_json})
                       <span class="info-university">${journal['journal']['organization']}</span>
                       <!--TODO: handle case where user used to have access to a course and no longer does -->
                       <span class="info-date-block-container">
-                      <!--TODO: i18n concerns? -->
-                      <span class="info-date-block">${_('Access Expires - {date}').format(date=journal['expiration_date'])}</span>
-                    </span>
+                      <!--TODO: i18n concerns - do the correct plural thing here -->
+                        <span class="info-date-block">${_('Access Expires: {date}').format(date=journal['overview'].expiration_date_formatted)}</span>
+                      </span>
                     </div>
                   </div>
                 </section>
