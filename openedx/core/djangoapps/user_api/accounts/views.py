@@ -5,6 +5,8 @@ For additional information and historical context, see:
 https://openedx.atlassian.net/wiki/display/TNL/User+API
 """
 import datetime
+from functools import wraps
+import logging
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
@@ -27,8 +29,10 @@ from openedx.core.lib.api.parsers import MergePatchParser
 from student.models import (
     User,
     get_retired_email_by_email,
+    get_retired_username_by_username,
     get_potentially_retired_user_by_username_and_hash,
-    get_potentially_retired_user_by_username
+    get_potentially_retired_user_by_username,
+    is_username_retired,
 )
 
 from .api import get_account_settings, update_account_settings
@@ -37,6 +41,22 @@ from .serializers import UserRetirementStatusSerializer
 from .signals import USER_RETIRE_MAILINGS
 from ..errors import UserNotFound, UserNotAuthorized, AccountUpdateError, AccountValidationError
 from ..models import UserOrgTag, RetirementState, RetirementStateError, UserRetirementStatus
+
+
+log = logging.getLogger(__name__)
+
+
+def request_requires_username(function):
+    @wraps(function)
+    def wrapper(self, request):
+        username = request.data.get('username', None)
+        if not username:
+            return Response(
+                status=status.HTTP_404_NOT_FOUND,
+                data={'message': text_type('The user was not specified.')}
+            )
+        return function(self, request)
+    return wrapper
 
 
 class AccountViewSet(ViewSet):
@@ -337,6 +357,7 @@ class DeactivateLogoutView(APIView):
     authentication_classes = (JwtAuthentication, )
     permission_classes = (permissions.IsAuthenticated, CanRetireUser)
 
+    @request_requires_username
     def post(self, request):
         """
         POST /api/user/v1/accounts/deactivate_logout
@@ -344,11 +365,10 @@ class DeactivateLogoutView(APIView):
         Marks the user as having no password set for deactivation purposes,
         and logs the user out.
         """
-        username = None
+        username = request.data.get('username', None)
+
         user_model = get_user_model()
         try:
-            # Get the username from the request and check that it exists
-            username = request.data['username']
             user = user_model.objects.get(username=username)
 
             with transaction.atomic():
@@ -388,7 +408,7 @@ class AccountRetirementView(ViewSet):
 
     def retirement_queue(self, request):
         """
-        GET /api/user/v1/accounts/accounts_to_retire/
+        GET /api/user/v1/accounts/retirement_queue/
         {'cool_off_days': 7, 'states': ['PENDING', 'COMPLETE']}
 
         Returns the list of RetirementStatus users in the given states that were
@@ -441,6 +461,7 @@ class AccountRetirementView(ViewSet):
         except (UserRetirementStatus.DoesNotExist, User.DoesNotExist):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
+    @request_requires_username
     def partial_update(self, request):
         """
         PATCH /api/user/v1/accounts/update_retirement_status/
@@ -469,3 +490,39 @@ class AccountRetirementView(ViewSet):
             return Response(text_type(exc), status=status.HTTP_400_BAD_REQUEST)
         except Exception as exc:  # pylint: disable=broad-except
             return Response(text_type(exc), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @request_requires_username
+    def post(self, request):
+        """
+        POST /api/user/v1/accounts/retire/
+
+        {
+            'username': 'user_to_retire'
+        }
+
+        Retires the user with the given username.  This includes
+        retiring this username, the associates email address, and
+        any other PII associated with this user.
+
+        Note that this implementation is the "merge patch" implementation proposed in
+        https://tools.ietf.org/html/rfc7396. The content_type must be "application/merge-patch+json" or
+        else an error response with status code 415 will be returned.
+        """
+        import pdb; pdb.set_trace()
+        username = request.data['username']
+        if is_username_retired(username):
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        user_model = get_user_model()
+        try:
+            user = user_model.objects.get(username=username)
+
+            with transaction.atomic():
+                user.username = get_retired_username_by_username(user.username)
+                # user.save()
+        except user_model.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        except Exception as exc:  # pylint: disable=broad-except
+            return Response(text_type(exc), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response(status=status.HTTP_204_NO_CONTENT)

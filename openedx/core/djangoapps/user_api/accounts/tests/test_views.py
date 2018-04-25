@@ -1585,3 +1585,31 @@ class TestAccountRetirementUpdate(RetirementTestCase):
         # Should already be in 'PENDING'
         data = {'new_state': 'PENDING', 'response': 'this should fail'}
         self.update_and_assert_status(data, status.HTTP_400_BAD_REQUEST)
+
+
+@unittest.skipUnless(settings.ROOT_URLCONF == 'lms.urls', 'Account APIs are only supported in LMS')
+class TestAccountRetirementPost(RetirementTestCase):
+    """
+    Tests the account retirement endpoint.
+    """
+    def setUp(self):
+        super(TestAccountRetirementPost, self).setUp()
+        self.test_user = UserFactory()
+        self.test_superuser = SuperuserFactory()
+        self.headers = self.build_jwt_headers(self.test_superuser)
+        self.headers['content_type'] = "application/merge-patch+json"
+        self.url = reverse('accounts_retire')
+
+    def post_and_assert_status(self, data, expected_status=status.HTTP_204_NO_CONTENT):
+        """
+        Helper function for making a request to the retire subscriptions endpoint, and asserting the status.
+        """
+        if 'username' not in data:
+            data['username'] = self.test_user.username
+
+        response = self.client.post(self.url, json.dumps(data), **self.headers)
+        self.assertEqual(response.status_code, expected_status)
+
+    def test_retire_user(self):
+        data = {'username': self.test_user.username}
+        self.post_and_assert_status(data)
