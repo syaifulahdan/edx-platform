@@ -58,6 +58,8 @@ class JournalOverview(object):
 
         self.about_page_url = self.get_journal_about_page_url()
 
+        self.has_access_expired = datetime.today() > self.expiration_datetime
+
     def get_journal_about_page_url(self):
         """
         Return url to journal about page.

@@ -126,13 +126,31 @@ banner.showMessage(${redirect_message | n, dump_js_escaped_json})
                       <!--TODO: handle case where user used to have access to a course and no longer does -->
                       <span class="info-date-block-container">
                       <!--TODO: i18n concerns - do the correct plural thing here -->
-                        <span class="info-date-block">${_('Access Expires: {date}').format(date=journal['overview'].expiration_date_formatted)}</span>
+                        % if journal['overview'].has_access_expired:
+                          <span class="info-date-block" aria-live="polite">
+                            <span class="icon fa fa-warning" aria-hidden="true"></span>
+                            ${_('Access Expired: {date}').format(date=journal['overview'].expiration_date_formatted)}
+                          </span>
+                        % else:
+                          <span class="info-date-block">
+                            ${_('Access Expires: {date}').format(date=journal['overview'].expiration_date_formatted)}
+                          </span>
+                        % endif
                       </span>
                     </div>
                   </div>
                   <div class="wrapper-course-actions">
                     <div class="course-actions">
-                      <!-- TODO: send user to purchase page if access has expired -->
+                      % if journal['overview'].has_access_expired:
+                      <a href="${journal['overview'].about_page_url}"
+                         class="enter-course"
+                         data-course-key="${journal['uuid']}">
+                        ${_('Renew Access')}
+                        <span class="sr">
+                          ${journal['overview'].title}
+                        </span>
+                      </a>
+                      % else:
                       <a href="${journal['overview'].about_page_url}"
                          class="enter-course"
                          data-course-key="${journal['uuid']}">
@@ -141,6 +159,7 @@ banner.showMessage(${redirect_message | n, dump_js_escaped_json})
                           ${journal['overview'].title}
                         </span>
                       </a>
+                      % endif
                     </div>
                   </div>
                 </section>
