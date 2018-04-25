@@ -137,28 +137,28 @@ banner.showMessage(${redirect_message | n, dump_js_escaped_json})
                         % endif
                       </span>
                     </div>
-                  </div>
-                  <div class="wrapper-course-actions">
-                    <div class="course-actions">
-                      % if journal['overview'].has_access_expired:
-                      <a href="${journal['overview'].about_page_url}"
-                         class="enter-course"
-                         data-course-key="${journal['uuid']}">
-                        ${_('Renew Access')}
-                        <span class="sr">
+                    <div class="wrapper-course-actions">
+                      <div class="course-actions">
+                        % if journal['overview'].has_access_expired:
+                        <a href="${journal['overview'].about_page_url}"
+                           class="enter-course"
+                           data-course-key="${journal['uuid']}">
+                          ${_('Renew Access')}
+                          <span class="sr">
                           ${journal['overview'].title}
                         </span>
-                      </a>
-                      % else:
-                      <a href="${journal['overview'].about_page_url}"
-                         class="enter-course"
-                         data-course-key="${journal['uuid']}">
-                        ${_('View Journal')}
-                        <span class="sr">
+                        </a>
+                        % else:
+                        <a href="${journal['overview'].about_page_url}"
+                           class="enter-course"
+                           data-course-key="${journal['uuid']}">
+                          ${_('View Journal')}
+                          <span class="sr">
                           ${journal['overview'].title}
                         </span>
-                      </a>
-                      % endif
+                        </a>
+                        % endif
+                      </div>
                     </div>
                   </div>
                 </section>
