@@ -98,7 +98,6 @@ banner.showMessage(${redirect_message | n, dump_js_escaped_json})
   <div class="dashboard" id="dashboard-main">
     <div class="main-container">
       <div class="my-courses" id="my-courses">
-        <!--TODO: make it say My Journals -->
         <%include file="learner_dashboard/_dashboard_navigation_journals.html"/>
 
         % if len(journals) > 0:
@@ -169,9 +168,16 @@ banner.showMessage(${redirect_message | n, dump_js_escaped_json})
           % endfor
         </ul>
         % else:
-        <!-- TODO: deal with case where there are no jouranls -->
+        <div class="empty-dashboard-message">
+          <p>${_("You have not purchased access to any journals yet.")}</p>
+          <!--TODO: add browse only journals button? -->
+          <a class="btn btn-primary" href="${marketing_link('COURSES')}">
+            ${_("Explore journals and courses")}
+          </a>
+        </div>
         % endif
       </div>
     </div>
+    <div class="side-container"></div>
   </div>
 </main>
