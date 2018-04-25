@@ -113,12 +113,12 @@ banner.showMessage(${redirect_message | n, dump_js_escaped_json})
                 <section class="details" aria-labelledby="details-heading-${journal['uuid']}">
                   <h2 class="hd hd-2 sr" id="details-heading-${journal['uuid']}">$_('Journal details')}</h2>
                   <div class="wrapper-course-image" aria-label="true">
-                    <a href="${journal['url']}" class="cover" tabindex="-1">
+                    <a href="${journal['overview'].about_page_url}" class="cover" tabindex="-1">
                       <img src="${journal['journal']['journalaboutpage']['card_image_absolute_url']}" class="course-image" alt="${_('{journal_title} Cover Image').format(journal_title=journal['journal']['name'])}"/>
                     </a>
                   </div>
                   <div class="wrapper-course-details">
-                    <h3 class="course-title" id="course-title-${journal['uuid']}" href="${journal['url']}">
+                    <h3 class="course-title" id="course-title-${journal['uuid']}" href="${journal['overview'].about_page_url}">
                       <a data-course-key="${journal['uuid']}">${journal['journal']['name']}</a>
                     </h3>
                     <div class="course-info">
@@ -128,6 +128,19 @@ banner.showMessage(${redirect_message | n, dump_js_escaped_json})
                       <!--TODO: i18n concerns - do the correct plural thing here -->
                         <span class="info-date-block">${_('Access Expires: {date}').format(date=journal['overview'].expiration_date_formatted)}</span>
                       </span>
+                    </div>
+                  </div>
+                  <div class="wrapper-course-actions">
+                    <div class="course-actions">
+                      <!-- TODO: send user to purchase page if access has expired -->
+                      <a href="${journal['overview'].about_page_url}"
+                         class="enter-course"
+                         data-course-key="${journal['uuid']}">
+                        ${_('View Journal')}
+                        <span class="sr">
+                          ${journal['overview'].title}
+                        </span>
+                      </a>
                     </div>
                   </div>
                 </section>

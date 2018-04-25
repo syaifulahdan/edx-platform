@@ -2,7 +2,7 @@
 from datetime import datetime, time
 from django.conf import settings
 from django.http import Http404
-from urlparse import urljoin
+from urlparse import urljoin, urlsplit, urlunsplit
 
 from edxmako.shortcuts import render_to_response
 from openedx.features.journals.api import JournalsApiClient, journals_enabled
@@ -27,7 +27,6 @@ def journal_listing(request):
     #TODO: pass list of journal overview objects back instead of the journal dicts
 
     for journal in journals:
-        journal['url'] = get_journal_about_page_url(slug=journal['journal']['journalaboutpage']['slug'])
         journal['expiration_date'] = str(journal['expiration_date'])
         journal['overview'] = JournalOverview(journal)
 
@@ -38,14 +37,6 @@ def journal_listing(request):
     return render_to_response('journal_dashboard.html', context)
 
 
-
-def get_journal_about_page_url(slug=''):
-    """
-    Returns the url of a journal about page for the given journal slug.
-    """
-    return urljoin(settings.JOURNALS_ROOT_URL, slug)
-
-
 class JournalOverview(object):
     """ Contains all data needed to generate a Journal Card"""
 
@@ -54,6 +45,8 @@ class JournalOverview(object):
         Arguments:
               journal (dict): journal dict containing info from the journal access api
         """
+        self.journal = journal
+
         # set expiration date to be the last second of the day it expires
         self.expiration_datetime = datetime.combine(
             date=datetime.strptime(journal['expiration_date'], '%Y-%m-%d').date(),
@@ -61,6 +54,28 @@ class JournalOverview(object):
         )
         self.expiration_date_formatted = self.expiration_datetime.strftime("%b %d %Y")
 
+        self.title = journal['journal']['name']
 
+        self.about_page_url = self.get_journal_about_page_url()
 
+    def get_journal_about_page_url(self):
+        """
+        Return url to journal about page.
+        The url will redirect through the journals service log in page.  Otherwise the user may be
+        sent to a page to purchase the book - and that is an awkward user experience.
+        """
+        login_url = urljoin(settings.JOURNALS_ROOT_URL, 'login')
 
+        slug = self.journal['journal']['journalaboutpage']['slug']
+        about_page_url = urljoin(settings.JOURNALS_ROOT_URL, slug)
+        query = 'next={next_url}'.format(next_url=about_page_url)
+
+        split_url = urlsplit(login_url)
+        url = urlunsplit((
+            split_url.scheme,
+            split_url.netloc,
+            split_url.path,
+            query,
+            split_url.fragment,
+        ))
+        return url
