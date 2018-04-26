@@ -73,7 +73,7 @@ def get_enforcement_deadline_for_user(rollout_config, user):
 
     if staff_deadline and user.is_staff:
         return staff_deadline
-    elif elevated_privilege_user_deadline and user.courseaccessrole_set.count():
+    elif elevated_privilege_user_deadline and user.courseaccessrole_set.exists():
         return elevated_privilege_user_deadline
     else:
         return general_user_deadline
