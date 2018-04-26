@@ -8,7 +8,7 @@ from openedx.core.djangoapps.plugins.constants import ProjectType, SettingsType,
 
 class PasswordPolicyConfig(AppConfig):
     """
-    Configuration class for bookmarks Django app
+    Configuration class for password_policy Django app
     """
     name = 'openedx.core.djangoapps.password_policy'
     verbose_name = _("Password Policy")
