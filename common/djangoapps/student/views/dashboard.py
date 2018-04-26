@@ -41,6 +41,7 @@ from openedx.core.djangoapps.site_configuration import helpers as configuration_
 from openedx.core.djangoapps.util.maintenance_banner import add_maintenance_banner
 from openedx.core.djangoapps.waffle_utils import WaffleFlag, WaffleFlagNamespace
 from openedx.features.enterprise_support.api import get_dashboard_consent_notification
+from openedx.features.journals.api import journals_enabled
 from shoppingcart.api import order_history
 from shoppingcart.models import CourseRegistrationCode, DonationConfiguration
 from student.cookies import set_user_info_cookie
@@ -546,11 +547,6 @@ def student_dashboard(request):
         The dashboard response.
 
     """
-
-    # journal_url = 'http://journals.app:18606/api/v1/'
-    # journal_client = EdxRestApiClient(journal_url)
-    # journal_response = journal_client.journalaccess.get(username=request.user.username)
-
     user = request.user
     if not UserProfile.objects.filter(user=user).exists():
         return redirect(reverse('account_settings'))
@@ -826,7 +822,7 @@ def student_dashboard(request):
         'nav_hidden': True,
         'inverted_programs': inverted_programs,
         'show_program_listing': ProgramsApiConfig.is_enabled(),
-        'show_journal_listing': True, #TODO: will not always be true
+        'show_journal_listing': journals_enabled(),
         'show_dashboard_tabs': True,
         'disable_courseware_js': True,
         'display_course_modes_on_dashboard': enable_verified_certificates and display_course_modes_on_dashboard,

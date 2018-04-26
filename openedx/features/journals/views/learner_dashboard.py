@@ -5,6 +5,7 @@ from django.http import Http404
 from urlparse import urljoin, urlsplit, urlunsplit
 
 from edxmako.shortcuts import render_to_response
+from openedx.core.djangoapps.programs.models import ProgramsApiConfig
 from openedx.features.journals.api import fetch_journal_access, journals_enabled
 
 import logging
@@ -27,6 +28,9 @@ def journal_listing(request):
 
     context = {
         'journals': journals,
+        'show_dashboard_tabs': True,
+        'show_program_listing': ProgramsApiConfig.is_enabled(),
+        'show_journal_listing': journals_enabled()
     }
 
     return render_to_response('journal_dashboard.html', context)
