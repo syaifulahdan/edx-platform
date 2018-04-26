@@ -368,6 +368,8 @@ class DeactivateLogoutView(APIView):
                     user.save()
                     _set_unusable_password(user)
                     # 3. Unlink social accounts & change password on each IDA, still to be implemented
+                    # 4. Add user to retirement queue
+                    AccountRetirementView.
                 return Response(status=status.HTTP_204_NO_CONTENT)
             else:
                 return verify_user_password_response
