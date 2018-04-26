@@ -23,9 +23,6 @@ def journal_listing(request):
     journal_client = JournalsApiClient()
     journals = journal_client.get_journal_access(user)
 
-    for journal in journals:
-        journal['overview'] = JournalOverview(journal)
-
     context = {
         'journals': journals,
     }
@@ -61,25 +58,39 @@ def get_journal_about_page_url(slug=''):
     return url
 
 
-class JournalOverview(object):
-    """ Contains all data needed to generate a Journal Card"""
+def format_expiration_date(expiration_date):
+    """
+    Formats Expiration Date
 
-    def __init__(self, journal):
-        """
-        Arguments:
-              journal (dict): journal dict containing info from the journal access api
-        """
-        self.journal = journal
+    Arguments:
+        expiration_date (str): in format 'YYYY-mm-dd' (ex. April 26, 2018 is: '2018-26-04')
 
-        # set expiration date to be the last second of the day it expires
-        self.expiration_datetime = datetime.combine(
-            date=datetime.strptime(journal['expiration_date'], '%Y-%m-%d').date(),
-            time=time.max
-        )
-        self.expiration_date_formatted = self.expiration_datetime.strftime("%b %d %Y")
+    Returns:
+        formatted expiration date (str): in format 'Mmm dd YYYY' (ex. April 26, 2018 is: 'Apr 26 2018')
+    """
 
-        # self.about_page_url = self.get_journal_about_page_url()
-
-        self.has_access_expired = datetime.today() > self.expiration_datetime
+    # set expiration date to be the last second of the day it expires
+    expiration_datetime = datetime.combine(
+        date=datetime.strptime(expiration_date, '%Y-%m-%d').date(),
+        time=time.max
+    )
+    return expiration_datetime.strftime("%b %d %Y")
 
 
+def has_access_expired(expiration_date):
+    """
+    Returns true if it is now past the expiration date.
+
+    Arguments:
+        expiration_date (str): in format 'YYYY-mm-dd' (ex. April 26, 2018 is: '2018-26-04')
+
+    Returns:
+        has access expired (boolean): True if access has expired
+    """
+    # set expiration date to be the last second of the day it expires
+    expiration_datetime = datetime.combine(
+        date=datetime.strptime(expiration_date, '%Y-%m-%d').date(),
+        time=time.max
+    )
+    now = datetime.today()
+    return now > expiration_datetime

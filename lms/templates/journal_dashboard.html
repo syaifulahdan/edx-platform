@@ -17,7 +17,7 @@ from openedx.core.djangoapps.content.course_overviews.models import CourseOvervi
 from openedx.core.djangoapps.site_configuration import helpers as configuration_helpers
 from openedx.core.djangolib.js_utils import dump_js_escaped_json, js_escaped_string
 from openedx.core.djangolib.markup import HTML, Text
-from openedx.features.journals.views.learner_dashboard import get_journal_about_page_url
+from openedx.features.journals.views.learner_dashboard import get_journal_about_page_url, format_expiration_date, has_access_expired
 
 from student.models import CourseEnrollment
 %>
@@ -104,7 +104,11 @@ banner.showMessage(${redirect_message | n, dump_js_escaped_json})
         % if len(journals) > 0:
         <ul class="listing-courses">
           % for journal in journals:
-          <% about_page_url = get_journal_about_page_url(slug=journal['journal']['journalaboutpage']['slug']) %>
+          <%
+            about_page_url = get_journal_about_page_url(slug=journal['journal']['journalaboutpage']['slug'])
+            formatted_expiration_date = format_expiration_date(journal['expiration_date'])
+            access_expired = has_access_expired(journal['expiration_date'])
+          %>
           <li class="course-item">
             <div class="course-container">
               <!--TODO: course overview language - i don't know what its doing but it sounds important -->
@@ -127,21 +131,21 @@ banner.showMessage(${redirect_message | n, dump_js_escaped_json})
                       <!--TODO: handle case where user used to have access to a course and no longer does -->
                       <span class="info-date-block-container">
                       <!--TODO: i18n concerns - do the correct plural thing here -->
-                        % if journal['overview'].has_access_expired:
+                        % if access_expired:
                           <span class="info-date-block" aria-live="polite">
                             <span class="icon fa fa-warning" aria-hidden="true"></span>
-                            ${_('Access Expired: {date}').format(date=journal['overview'].expiration_date_formatted)}
+                            ${_('Access Expired: {date}').format(date=formatted_expiration_date)}
                           </span>
                         % else:
                           <span class="info-date-block">
-                            ${_('Access Expires: {date}').format(date=journal['overview'].expiration_date_formatted)}
+                            ${_('Access Expires: {date}').format(date=formatted_expiration_date)}
                           </span>
                         % endif
                       </span>
                     </div>
                     <div class="wrapper-course-actions">
                       <div class="course-actions">
-                        % if journal['overview'].has_access_expired:
+                        % if access_expired:
                         <a href="${about_page_url}"
                            class="enter-course"
                            data-course-key="${journal['uuid']}">
