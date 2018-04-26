@@ -12,4 +12,3 @@ urlpatterns = [
         name='program_details_fragment_view'),
     url(r'^journals/$', journal_views.journal_listing, name='journal_listing_view'),
 ]
-#TODO: move journals urls to journal project
