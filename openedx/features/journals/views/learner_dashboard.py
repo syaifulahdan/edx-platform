@@ -5,23 +5,25 @@ from django.http import Http404
 from urlparse import urljoin, urlsplit, urlunsplit
 
 from edxmako.shortcuts import render_to_response
-from openedx.features.journals.api import JournalsApiClient, journals_enabled
+from openedx.features.journals.api import fetch_journal_access, journals_enabled
 
 import logging
 logger = logging.getLogger(__name__)
 
+
 def journal_listing(request):
     """ View a list of journals which the user has or had access to"""
-    #TODO: check assumption, list journals that user HAD access to but no longer does
 
-    # import pdb; pdb.set_trace()
     user = request.user
 
     if not journals_enabled() or not user.is_authenticated():
         raise Http404
 
-    journal_client = JournalsApiClient()
-    journals = journal_client.get_journal_access(user)
+    #TODO: handle errors thrown in fetch_journal_access
+    journals = fetch_journal_access(
+        site=request.site,
+        user=request.user
+    )
 
     context = {
         'journals': journals,

@@ -90,18 +90,38 @@ class JournalsApiClient(object):
         """ Return journals worker """
         return User.objects.get(username=JOURNAL_WORKER_USERNAME)
 
-    def get_journal_access(self, user):
-        """ Get list of journals that the user has or had access to. """
-        # TODO: what to do about expired journals
-        try:
-            response = self.client.journalaccess.get(user=user)
-            return response
-        except (HttpClientError, HttpServerError) as err:
-            LOGGER.exception(
-                'Failed to get journal access records from journal-service [%s]',
-                err.content
-            )
-            return []
+
+def fetch_journal_access(site, user):
+    """
+    Retrieve journal access record for given user.
+    Retrieve if from the cache if present, otherwise send GET request to the journal access api
+        and store it in the cache
+
+    Args:
+        site (Site)
+        user (username | str): user to retrieve access records for
+
+    Returns:
+        list of dicts: list of journal access dicts
+
+    Raises:
+        ConnectionError: raised if lms is unable to connect to the journals service.
+        SlumberBaseException: raised if API response contains http error status like 4xx, 5xx etc...
+        Timeout: raised if API is talking to long to respond
+    """
+    api_resourse = 'journal_access'
+    cache_key = get_cache_key(
+        site_domain=site.domain,
+        resourse=api_resourse,
+        user=user
+    )
+
+    journal_access_records = cache.get(cache_key)
+    if not journal_access_records:
+        journal_access_records = JournalsApiClient().client.journalaccess.get(user=user)
+        cache.set(cache_key, journal_access_records, JOURNALS_CACHE_TIMEOUT)
+
+    return journal_access_records
 
 
 def get_cache_key(**kwargs):
