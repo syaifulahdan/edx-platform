@@ -19,6 +19,7 @@ from bs4 import BeautifulSoup
 from django.conf import settings
 from django.core import mail
 from django.core.urlresolvers import reverse
+from django.http import JsonResponse
 from django.test import TestCase
 from django.test.client import Client, RequestFactory
 from django.test.utils import override_settings
@@ -27,6 +28,7 @@ from mock import Mock, patch
 from nose.plugins.attrib import attr
 from opaque_keys.edx.keys import CourseKey
 from opaque_keys.edx.locator import CourseLocator
+from sailthru import SailthruResponse
 from waffle.testutils import override_switch
 
 from common.test.utils import XssTestMixin
@@ -36,7 +38,7 @@ from lms.djangoapps.commerce.models import CommerceConfiguration
 from lms.djangoapps.commerce.tests import TEST_API_URL, TEST_PAYMENT_DATA, TEST_PUBLIC_URL_ROOT
 from lms.djangoapps.commerce.utils import EcommerceService
 from lms.djangoapps.verify_student.models import SoftwareSecurePhotoVerification, VerificationDeadline
-from lms.djangoapps.verify_student.views import PayAndVerifyView, checkout_with_ecommerce_service, render_to_response
+from lms.djangoapps.verify_student.views import PayAndVerifyView, checkout_with_ecommerce_service, render_to_response, EmailMarketingConfiguration
 from openedx.core.djangoapps.embargo.test_utils import restrict_course
 from openedx.core.djangoapps.theming.tests.test_util import with_comprehensive_theme
 from openedx.core.djangoapps.user_api.accounts.api import get_account_settings
@@ -1763,10 +1765,13 @@ class TestPhotoVerificationResultsCallback(ModuleStoreTestCase):
         'lms.djangoapps.verify_student.ssencrypt.has_valid_signature',
         mock.Mock(side_effect=mocked_has_valid_signature)
     )
-    def test_pass_result(self):
+    @mock.patch('lms.djangoapps.verify_student.views.log.error')
+    @mock.patch('lms.djangoapps.verify_student.utils.SailthruClient.send')
+    def test_pass_result(self, mock_sailthru_send, mock_log_error):
         """
         Test for verification passed.
         """
+        EmailMarketingConfiguration.objects.create(sailthru_verification_passed_template='test_template')
         data = {
             "EdX-ID": self.receipt_id,
             "Result": "PASS",
@@ -1783,16 +1788,20 @@ class TestPhotoVerificationResultsCallback(ModuleStoreTestCase):
         attempt = SoftwareSecurePhotoVerification.objects.get(receipt_id=self.receipt_id)
         self.assertEqual(attempt.status, u'approved')
         self.assertEquals(response.content, 'OK!')
-        self.assertEqual(len(mail.outbox), 1)
+        self.assertFalse(mock_log_error.called)
+        self.assertTrue(mock_sailthru_send.call_args[1], 'test_template')
 
     @mock.patch(
         'lms.djangoapps.verify_student.ssencrypt.has_valid_signature',
         mock.Mock(side_effect=mocked_has_valid_signature)
     )
-    def test_fail_result(self):
+    @mock.patch('lms.djangoapps.verify_student.views.log.error')
+    @mock.patch('lms.djangoapps.verify_student.views.SailthruClient.send')
+    def test_fail_result(self, mock_sailthru_send, mock_log_error):
         """
         Test for failed verification.
         """
+        EmailMarketingConfiguration.objects.create(sailthru_verification_failed_template='test_template')
         data = {
             "EdX-ID": self.receipt_id,
             "Result": 'FAIL',
@@ -1812,7 +1821,8 @@ class TestPhotoVerificationResultsCallback(ModuleStoreTestCase):
         self.assertEqual(attempt.error_code, u'Your photo doesn\'t meet standards.')
         self.assertEqual(attempt.error_msg, u'"Invalid photo"')
         self.assertEquals(response.content, 'OK!')
-        self.assertEqual(len(mail.outbox), 1)
+        self.assertFalse(mock_log_error.called)
+        self.assertTrue(mock_sailthru_send.call_args[1], 'test_template')
 
     @mock.patch(
         'lms.djangoapps.verify_student.ssencrypt.has_valid_signature',
@@ -1863,29 +1873,6 @@ class TestPhotoVerificationResultsCallback(ModuleStoreTestCase):
             HTTP_DATE='testdate'
         )
         self.assertIn('Result Unknown not understood', response.content)
-
-    @mock.patch(
-        'lms.djangoapps.verify_student.utils.send_mail',
-        mock.Mock(side_effect=Exception())
-    )
-    def test_verification_status_email_not_sent(self):
-        """
-        Test email is not sent in case of exception
-        """
-        data = {
-            "EdX-ID": self.receipt_id,
-            "Result": "PASS",
-            "Reason": "",
-            "MessageType": "You have been verified."
-        }
-        json_data = json.dumps(data)
-        self.client.post(
-            reverse('verify_student_results_callback'), data=json_data,
-            content_type='application/json',
-            HTTP_AUTHORIZATION='test BBBBBBBBBBBBBBBBBBBB:testing',
-            HTTP_DATE='testdate'
-        )
-        self.assertEqual(len(mail.outbox), 0)
 
 
 @attr(shard=2)
