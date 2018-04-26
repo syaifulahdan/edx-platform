@@ -33,7 +33,7 @@ def journal_listing(request):
         'show_journal_listing': journals_enabled()
     }
 
-    return render_to_response('journal_dashboard.html', context)
+    return render_to_response('learner_dashboard/journal_dashboard.html', context)
 
 
 def get_journal_about_page_url(slug=''):
