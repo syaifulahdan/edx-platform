@@ -9,6 +9,7 @@ from functools import wraps
 import logging
 
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.db import transaction
 from edx_rest_framework_extensions.authentication import JwtAuthentication
 from rest_framework import permissions
@@ -20,6 +21,8 @@ from six import text_type
 from social_django.models import UserSocialAuth
 import pytz
 
+from openedx.core.djangoapps.profile_images.images import remove_profile_images
+from openedx.core.djangoapps.user_api.accounts.image_helpers import get_profile_image_names, set_has_profile_image
 from openedx.core.djangoapps.user_api.preferences.api import update_email_opt_in
 from openedx.core.lib.api.authentication import (
     SessionAuthenticationAllowInactiveUser,
@@ -28,6 +31,7 @@ from openedx.core.lib.api.authentication import (
 from openedx.core.lib.api.parsers import MergePatchParser
 from student.models import (
     User,
+    UserProfile,
     get_retired_email_by_email,
     get_retired_username_by_username,
     get_potentially_retired_user_by_username_and_hash,
@@ -45,6 +49,17 @@ from ..models import UserOrgTag, RetirementState, RetirementStateError, UserReti
 
 log = logging.getLogger(__name__)
 
+USER_PROFILE_PII = {
+    'name': '',
+    'meta': '',
+    'location': '',
+    'year_of_birth': None,
+    'gender': None,
+    'mailing_address': None,
+    'city': None,
+    'country': None,
+    'bio': None,
+}
 
 def request_requires_username(function):
     @wraps(function)
@@ -508,7 +523,6 @@ class AccountRetirementView(ViewSet):
         https://tools.ietf.org/html/rfc7396. The content_type must be "application/merge-patch+json" or
         else an error response with status code 415 will be returned.
         """
-        import pdb; pdb.set_trace()
         username = request.data['username']
         if is_username_retired(username):
             return Response(status=status.HTTP_404_NOT_FOUND)
@@ -518,7 +532,22 @@ class AccountRetirementView(ViewSet):
             user = user_model.objects.get(username=username)
 
             with transaction.atomic():
+                #1, 2, 10
                 user.username = get_retired_username_by_username(user.username)
+                user.first_name = ''
+                user.last_name = ''
+                user.is_active = False
+                #3 and 7
+                self.clear_pii_from_userprofile(user)
+                #4 TODO
+                #5 TODO
+                #6
+                self.delete_users_profile_images(user)
+                #8 TODO: 
+                self.delete_users_country_cache(user)
+
+
+
                 # user.save()
         except user_model.DoesNotExist:
             return Response(status=status.HTTP_404_NOT_FOUND)
@@ -526,3 +555,22 @@ class AccountRetirementView(ViewSet):
             return Response(text_type(exc), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
+    
+    @staticmethod
+    def clear_pii_from_userprofile(user):
+        for model_field, value_to_assign in USER_PROFILE_PII.iteritems():
+            setattr(user, model_field, value_to_assign)
+
+        user.profile.social_links.all().delete()
+        #user.profile.save()
+
+    @staticmethod
+    def delete_users_profile_images(user):
+        set_has_profile_image(user.username, False)
+        names_of_profile_images = get_profile_image_names(user.username)
+        remove_profile_images(names_of_profile_images)
+
+    @staticmethod
+    def delete_users_country_cache(user):
+        cache_key = UserProfile.country_cache_key_name(user.id)
+        cache.delete(cache_key)

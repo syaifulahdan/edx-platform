@@ -2,19 +2,19 @@
 """
 Test cases to cover Accounts-related behaviors of the User API application
 """
-from __future__ import print_function
-
+from copy import deepcopy
 import datetime
 import hashlib
 import json
+import mock
 import unittest
-from copy import deepcopy
 
 import ddt
 import pytest
 import pytz
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.core.urlresolvers import reverse
 from django.test import TestCase
 from django.test.testcases import TransactionTestCase
@@ -32,7 +32,7 @@ from openedx.core.djangoapps.user_api.models import RetirementState, UserRetirem
 from openedx.core.djangoapps.user_api.preferences.api import set_user_preference
 from openedx.core.djangolib.testing.utils import CacheIsolationTestCase, skip_unless_lms
 from openedx.core.lib.token_utils import JwtBuilder
-from student.models import PendingEmailChange, UserProfile, get_retired_username_by_username, get_retired_email_by_email
+from student.models import PendingEmailChange, UserProfile, get_retired_username_by_username, get_retired_email_by_email, SocialLink
 from student.tests.factories import (
     TEST_PASSWORD,
     ContentTypeFactory,
@@ -41,6 +41,7 @@ from student.tests.factories import (
     UserFactory
 )
 from .. import ALL_USERS_VISIBILITY, PRIVATE_VISIBILITY
+from ..views import AccountRetirementView, USER_PROFILE_PII
 
 TEST_PROFILE_IMAGE_UPLOADED_AT = datetime.datetime(2002, 1, 9, 15, 43, 1, tzinfo=UTC)
 
@@ -1170,9 +1171,6 @@ class TestAccountRetireMailings(RetirementTestCase):
         """
         response = self.client.post(self.url, self.build_post(self.test_user), **headers)
 
-        if response.status_code != expected_status:
-            print(response)
-
         self.assertEqual(response.status_code, expected_status)
 
         # Check that the expected number of tags with the correct value exist
@@ -1594,7 +1592,14 @@ class TestAccountRetirementPost(RetirementTestCase):
     """
     def setUp(self):
         super(TestAccountRetirementPost, self).setUp()
+
         self.test_user = UserFactory()
+        SocialLink.objects.create(
+            user_profile=self.test_user.profile,
+            platform='Facebook',
+            social_link='www.facebook.com'
+        ).save()
+
         self.test_superuser = SuperuserFactory()
         self.headers = self.build_jwt_headers(self.test_superuser)
         self.headers['content_type'] = "application/merge-patch+json"
@@ -1610,6 +1615,61 @@ class TestAccountRetirementPost(RetirementTestCase):
         response = self.client.post(self.url, json.dumps(data), **self.headers)
         self.assertEqual(response.status_code, expected_status)
 
-    def test_retire_user(self):
-        data = {'username': self.test_user.username}
-        self.post_and_assert_status(data)
+    def test_user_profile_pii_has_expected_values(self):
+        expected_user_profile_pii = {
+            'name': '',
+            'meta': '',
+            'location': '',
+            'year_of_birth': None,
+            'gender': None,
+            'mailing_address': None,
+            'city': None,
+            'country': None,
+            'bio': None,
+        }
+        self.assertEqual(expected_user_profile_pii, USER_PROFILE_PII)
+
+    # def test_retire_user(self):
+    #     data = {'username': self.test_user.username}
+    #     self.post_and_assert_status(data)
+
+    def test_deletes_pii_from_user_profile(self):
+        for model_field, value_to_assign in USER_PROFILE_PII.iteritems():
+            if value_to_assign == '':
+                value = 'foo'
+            else:
+                value = mock.Mock()
+            setattr(self.test_user.profile, model_field, value)
+
+        AccountRetirementView.clear_pii_from_userprofile(self.test_user)
+
+        for model_field, value_to_assign in USER_PROFILE_PII.iteritems():
+            self.assertEqual(value_to_assign, getattr(self.test_user, model_field))
+
+        social_links = SocialLink.objects.filter(
+            user_profile=self.test_user.profile
+        )
+        self.assertFalse(social_links.exists())
+
+    @mock.patch('openedx.core.djangoapps.user_api.accounts.views.get_profile_image_names')
+    @mock.patch('openedx.core.djangoapps.user_api.accounts.views.remove_profile_images')
+    def test_removes_user_profile_images(
+        self, mock_remove_profile_images, mock_get_profile_image_names
+    ):
+        test_datetime = datetime.datetime(2018,1,1)
+        self.test_user.profile.profile_image_uploaded_at = test_datetime
+
+        AccountRetirementView.delete_users_profile_images(self.test_user)
+        self.test_user.profile.refresh_from_db()
+
+        self.assertIsNone(self.test_user.profile.profile_image_uploaded_at)
+        mock_get_profile_image_names.assert_called_once_with(self.test_user.username)
+        mock_remove_profile_images.assert_called_once_with(
+            mock_get_profile_image_names.return_value
+        )
+
+    def test_can_delete_user_profiles_country_cache(self):
+        cache_key = UserProfile.country_cache_key_name(self.test_user.id)
+        cache.set(cache_key, 'Timor-leste')
+        AccountRetirementView.delete_users_country_cache(self.test_user)
+        self.assertIsNone(cache.get(cache_key))
