@@ -7,7 +7,8 @@ https://openedx.atlassian.net/wiki/display/TNL/User+API
 import datetime
 
 import pytz
-from django.contrib.auth import get_user_model
+from django.conf import settings
+from django.contrib.auth import get_user_model, authenticate
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.utils.decorators import method_decorator
@@ -22,6 +23,8 @@ from rest_framework.viewsets import ViewSet
 from six import text_type
 from social_django.models import UserSocialAuth
 from student.models import (
+    AuthFailedError,
+    LoginFailures,
     User,
     get_retired_email_by_email,
     get_potentially_retired_user_by_username_and_hash,
@@ -352,23 +355,71 @@ class DeactivateLogoutView(APIView):
         try:
             # Get the username from the request and check that it exists
             username = request.data['username']
-            user = user_model.objects.get(username=username)
 
-            with transaction.atomic():
-                # 1. Unlink LMS social auth accounts
-                UserSocialAuth.objects.filter(user_id=user.id).delete()
-                # 2. Change LMS password & email
-                user.email = get_retired_email_by_email(user.email)
-                user.save()
-                _set_unusable_password(user)
-                # 3. Unlink social accounts & change password on each IDA, still to be implemented
-            return Response(status=status.HTTP_204_NO_CONTENT)
+            verify_user_password_response = self._verify_user_password(request)
+            if verify_user_password_response['status'] != status.HTTP_204_NO_CONTENT:
+                user = user_model.objects.get(username=username)
+
+                with transaction.atomic():
+                    # 1. Unlink LMS social auth accounts
+                    UserSocialAuth.objects.filter(user_id=user.id).delete()
+                    # 2. Change LMS password & email
+                    user.email = get_retired_email_by_email(user.email)
+                    user.save()
+                    _set_unusable_password(user)
+                    # 3. Unlink social accounts & change password on each IDA, still to be implemented
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            else:
+                return verify_user_password_response
         except KeyError:
             return Response(u'Username not specified.', status=status.HTTP_404_NOT_FOUND)
         except user_model.DoesNotExist:
             return Response(u'The user "{}" does not exist.'.format(username), status=status.HTTP_404_NOT_FOUND)
         except Exception as exc:  # pylint: disable=broad-except
             return Response(text_type(exc), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @login_required
+    @ensure_csrf_cookie
+    def _verify_user_password(self, request):
+        """
+        If the user is logged in and we want to verify that they have submitted the correct password
+        for a major account change (for example, retiring this user's account).
+
+        Args:
+            request (HttpRequest): A request object where the password should be included in the POST fields.
+        """
+        try:
+            self._check_excessive_login_attempts(request.user)
+            user = authenticate(username=request.user.username, password=request.POST['password'], request=request)
+            if user:
+                if LoginFailures.is_feature_enabled():
+                    LoginFailures.clear_lockout_counter(user)
+                return Response(status.HTTP_204_NO_CONTENT)
+            else:
+                self._handle_failed_authentication(request.user)
+        except AuthFailedError as err:
+            return Response(text_type(err), status=status.HTTP_403_FORBIDDEN)
+        except Exception:  # pylint: disable=broad-except
+            return Response(u"Could not verify user password", status=status.HTTP_400_BAD_REQUEST)
+
+    def _check_excessive_login_attempts(self, user):
+        """
+        See if account has been locked out due to excessive login failures
+        """
+        if user and LoginFailures.is_feature_enabled():
+            if LoginFailures.is_user_locked_out(user):
+                raise AuthFailedError(_('This account has been temporarily locked due '
+                                        'to excessive login failures. Try again later.'))
+
+    def _handle_failed_authentication(self, user):
+        """
+        Handles updating the failed login count, inactive user notifications, and logging failed authentications.
+        """
+        if user:
+            if LoginFailures.is_feature_enabled():
+                LoginFailures.increment_lockout_counter(user)
+
+        raise AuthFailedError(_('Email or password is incorrect.'))
 
 
 def _set_unusable_password(user):
