@@ -23,11 +23,7 @@ def journal_listing(request):
     journal_client = JournalsApiClient()
     journals = journal_client.get_journal_access(user)
 
-    #TODO: convert all this to the journal overview object
-    #TODO: pass list of journal overview objects back instead of the journal dicts
-
     for journal in journals:
-        journal['expiration_date'] = str(journal['expiration_date'])
         journal['overview'] = JournalOverview(journal)
 
     context = {
@@ -35,6 +31,34 @@ def journal_listing(request):
     }
 
     return render_to_response('journal_dashboard.html', context)
+
+
+def get_journal_about_page_url(slug=''):
+    """
+    Return url to journal about page.
+    The url will redirect through the journals service log in page.  Otherwise the user may be
+    sent to a page to purchase the book - and that is an awkward user experience.
+
+    Arguments:
+        slug (str): unique string associated with each journal about page
+
+    Returns:
+        url (str): url points to Journals Service login, w/ a redirect to journal about page
+    """
+    login_url = urljoin(settings.JOURNALS_ROOT_URL, 'login')
+
+    about_page_url = urljoin(settings.JOURNALS_ROOT_URL, slug)
+    query = 'next={next_url}'.format(next_url=about_page_url)
+
+    split_url = urlsplit(login_url)
+    url = urlunsplit((
+        split_url.scheme,
+        split_url.netloc,
+        split_url.path,
+        query,
+        split_url.fragment,
+    ))
+    return url
 
 
 class JournalOverview(object):
@@ -54,30 +78,8 @@ class JournalOverview(object):
         )
         self.expiration_date_formatted = self.expiration_datetime.strftime("%b %d %Y")
 
-        self.title = journal['journal']['name']
-
-        self.about_page_url = self.get_journal_about_page_url()
+        # self.about_page_url = self.get_journal_about_page_url()
 
         self.has_access_expired = datetime.today() > self.expiration_datetime
 
-    def get_journal_about_page_url(self):
-        """
-        Return url to journal about page.
-        The url will redirect through the journals service log in page.  Otherwise the user may be
-        sent to a page to purchase the book - and that is an awkward user experience.
-        """
-        login_url = urljoin(settings.JOURNALS_ROOT_URL, 'login')
 
-        slug = self.journal['journal']['journalaboutpage']['slug']
-        about_page_url = urljoin(settings.JOURNALS_ROOT_URL, slug)
-        query = 'next={next_url}'.format(next_url=about_page_url)
-
-        split_url = urlsplit(login_url)
-        url = urlunsplit((
-            split_url.scheme,
-            split_url.netloc,
-            split_url.path,
-            query,
-            split_url.fragment,
-        ))
-        return url

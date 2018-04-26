@@ -17,6 +17,7 @@ from openedx.core.djangoapps.content.course_overviews.models import CourseOvervi
 from openedx.core.djangoapps.site_configuration import helpers as configuration_helpers
 from openedx.core.djangolib.js_utils import dump_js_escaped_json, js_escaped_string
 from openedx.core.djangolib.markup import HTML, Text
+from openedx.features.journals.views.learner_dashboard import get_journal_about_page_url
 
 from student.models import CourseEnrollment
 %>
@@ -103,6 +104,7 @@ banner.showMessage(${redirect_message | n, dump_js_escaped_json})
         % if len(journals) > 0:
         <ul class="listing-courses">
           % for journal in journals:
+          <% about_page_url = get_journal_about_page_url(slug=journal['journal']['journalaboutpage']['slug']) %>
           <li class="course-item">
             <div class="course-container">
               <!--TODO: course overview language - i don't know what its doing but it sounds important -->
@@ -112,12 +114,12 @@ banner.showMessage(${redirect_message | n, dump_js_escaped_json})
                 <section class="details" aria-labelledby="details-heading-${journal['uuid']}">
                   <h2 class="hd hd-2 sr" id="details-heading-${journal['uuid']}">$_('Journal details')}</h2>
                   <div class="wrapper-course-image" aria-label="true">
-                    <a href="${journal['overview'].about_page_url}" class="cover" tabindex="-1">
+                    <a href="${about_page_url}" class="cover" tabindex="-1">
                       <img src="${journal['journal']['journalaboutpage']['card_image_absolute_url']}" class="course-image" alt="${_('{journal_title} Cover Image').format(journal_title=journal['journal']['name'])}"/>
                     </a>
                   </div>
                   <div class="wrapper-course-details">
-                    <h3 class="course-title" id="course-title-${journal['uuid']}" href="${journal['overview'].about_page_url}">
+                    <h3 class="course-title" id="course-title-${journal['uuid']}" href="${about_page_url}">
                       <a data-course-key="${journal['uuid']}">${journal['journal']['name']}</a>
                     </h3>
                     <div class="course-info">
@@ -140,21 +142,21 @@ banner.showMessage(${redirect_message | n, dump_js_escaped_json})
                     <div class="wrapper-course-actions">
                       <div class="course-actions">
                         % if journal['overview'].has_access_expired:
-                        <a href="${journal['overview'].about_page_url}"
+                        <a href="${about_page_url}"
                            class="enter-course"
                            data-course-key="${journal['uuid']}">
                           ${_('Renew Access')}
                           <span class="sr">
-                          ${journal['overview'].title}
+                          ${journal['journal']['name']}
                         </span>
                         </a>
                         % else:
-                        <a href="${journal['overview'].about_page_url}"
+                        <a href="${about_page_url}"
                            class="enter-course"
                            data-course-key="${journal['uuid']}">
                           ${_('View Journal')}
                           <span class="sr">
-                          ${journal['overview'].title}
+                          ${journal['journal']['name']}
                         </span>
                         </a>
                         % endif
