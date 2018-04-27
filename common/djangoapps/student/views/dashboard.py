@@ -1,7 +1,7 @@
 """
 Dashboard view and supporting methods
 """
-from edx_rest_api_client.client import EdxRestApiClient
+
 import datetime
 import logging
 from collections import defaultdict
@@ -56,7 +56,6 @@ from util.milestones_helpers import get_pre_requisite_courses_not_completed
 from xmodule.modulestore.django import modulestore
 
 log = logging.getLogger("edx.student")
-
 
 
 def get_org_black_and_whitelist_for_site():
@@ -552,6 +551,7 @@ def student_dashboard(request):
         return redirect(reverse('account_settings'))
 
     platform_name = configuration_helpers.get_value("platform_name", settings.PLATFORM_NAME)
+
     enable_verified_certificates = configuration_helpers.get_value(
         'ENABLE_VERIFIED_CERTIFICATES',
         settings.FEATURES.get('ENABLE_VERIFIED_CERTIFICATES')
