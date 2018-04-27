@@ -1596,10 +1596,9 @@ class TestAccountRetirementCreate(RetirementTestCase):
         super(TestAccountRetirementCreate, self).setUp()
         self.test_user = UserFactory()
         self.test_superuser = SuperuserFactory()
-        self.url = reverse('retirement_queue')
+        self.url = reverse('accounts_retirement_queue')
         self.headers = self.build_jwt_headers(self.test_superuser)
         self.maxDiff = None
-        self.setup_states()
 
     def test_no_retirement(self):
         """

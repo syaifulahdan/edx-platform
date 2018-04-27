@@ -23,13 +23,12 @@ from rest_framework.viewsets import ViewSet
 from six import text_type
 from social_django.models import UserSocialAuth
 from student.models import (
-    AuthFailedError,
-    LoginFailures,
     User,
     get_retired_email_by_email,
     get_potentially_retired_user_by_username_and_hash,
     get_potentially_retired_user_by_username
 )
+from student.views.login import AuthFailedError, LoginFailures
 
 from openedx.core.djangoapps.user_api.preferences.api import update_email_opt_in
 from openedx.core.lib.api.authentication import (
@@ -369,7 +368,7 @@ class DeactivateLogoutView(APIView):
                     _set_unusable_password(user)
                     # 3. Unlink social accounts & change password on each IDA, still to be implemented
                     # 4. Add user to retirement queue
-                    AccountRetirementView.
+                    AccountRetirementView.create(request)
                 return Response(status=status.HTTP_204_NO_CONTENT)
             else:
                 return verify_user_password_response
