@@ -6,12 +6,8 @@ from copy import deepcopy
 import datetime
 import hashlib
 import json
-import mock
 import unittest
 
-import ddt
-import pytest
-import pytz
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.cache import cache
@@ -19,12 +15,16 @@ from django.core.urlresolvers import reverse
 from django.test import TestCase
 from django.test.testcases import TransactionTestCase
 from django.test.utils import override_settings
-from mock import MagicMock, patch
+import mock
 from nose.plugins.attrib import attr
 from pytz import UTC
 from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 from social_django.models import UserSocialAuth
+import ddt
+import pytest
+import pytz
+from six import text_type
 
 from openedx.core.djangoapps.user_api.accounts import ACCOUNT_VISIBILITY_PREF_KEY
 from openedx.core.djangoapps.user_api.accounts.signals import USER_RETIRE_MAILINGS
@@ -32,11 +32,19 @@ from openedx.core.djangoapps.user_api.models import RetirementState, UserRetirem
 from openedx.core.djangoapps.user_api.preferences.api import set_user_preference
 from openedx.core.djangolib.testing.utils import CacheIsolationTestCase, skip_unless_lms
 from openedx.core.lib.token_utils import JwtBuilder
-from student.models import PendingEmailChange, UserProfile, get_retired_username_by_username, get_retired_email_by_email, SocialLink
+from student.models import (
+    PendingEmailChange,
+    Registration,
+    SocialLink,
+    UserProfile,
+    get_retired_username_by_username,
+    get_retired_email_by_email,
+)
 from student.tests.factories import (
     TEST_PASSWORD,
     ContentTypeFactory,
     PermissionFactory,
+    RegistrationFactory,
     SuperuserFactory,
     UserFactory
 )
@@ -208,8 +216,8 @@ class TestOwnUsernameAPI(CacheIsolationTestCase, UserAPITestCase):
 
 @ddt.ddt
 @skip_unless_lms
-@patch('openedx.core.djangoapps.user_api.accounts.image_helpers._PROFILE_IMAGE_SIZES', [50, 10])
-@patch.dict(
+@mock.patch('openedx.core.djangoapps.user_api.accounts.image_helpers._PROFILE_IMAGE_SIZES', [50, 10])
+@mock.patch.dict(
     'django.conf.settings.PROFILE_IMAGE_SIZES_MAP',
     {'full': 50, 'small': 10},
     clear=True
@@ -307,7 +315,7 @@ class TestAccountsAPI(CacheIsolationTestCase, UserAPITestCase):
     # Note: using getattr so that the patching works even if there is no configuration.
     # This is needed when testing CMS as the patching is still executed even though the
     # suite is skipped.
-    @patch.dict(getattr(settings, "ACCOUNT_VISIBILITY_CONFIGURATION", {}), {"default_visibility": "all_users"})
+    @mock.patch.dict(getattr(settings, "ACCOUNT_VISIBILITY_CONFIGURATION", {}), {"default_visibility": "all_users"})
     @pytest.mark.django111_expected_failure
     def test_get_account_different_user_visible(self):
         """
@@ -323,7 +331,7 @@ class TestAccountsAPI(CacheIsolationTestCase, UserAPITestCase):
     # Note: using getattr so that the patching works even if there is no configuration.
     # This is needed when testing CMS as the patching is still executed even though the
     # suite is skipped.
-    @patch.dict(getattr(settings, "ACCOUNT_VISIBILITY_CONFIGURATION", {}), {"default_visibility": "private"})
+    @mock.patch.dict(getattr(settings, "ACCOUNT_VISIBILITY_CONFIGURATION", {}), {"default_visibility": "private"})
     @pytest.mark.django111_expected_failure
     def test_get_account_different_user_private(self):
         """
@@ -336,7 +344,7 @@ class TestAccountsAPI(CacheIsolationTestCase, UserAPITestCase):
             response = self.send_get(self.different_client)
         self._verify_private_account_response(response, account_privacy=PRIVATE_VISIBILITY)
 
-    @patch.dict(settings.FEATURES, {'ENABLE_OPENBADGES': True})
+    @mock.patch.dict(settings.FEATURES, {'ENABLE_OPENBADGES': True})
     @ddt.data(
         ("client", "user", PRIVATE_VISIBILITY),
         ("different_client", "different_user", PRIVATE_VISIBILITY),
@@ -620,7 +628,7 @@ class TestAccountsAPI(CacheIsolationTestCase, UserAPITestCase):
         verify_change_info(name_change_info[0], old_name, self.user.username, "Donald Duck",)
         verify_change_info(name_change_info[1], "Mickey Mouse", self.user.username, "Donald Duck")
 
-    @patch.dict(
+    @mock.patch.dict(
         'django.conf.settings.PROFILE_IMAGE_SIZES_MAP',
         {'full': 50, 'medium': 30, 'small': 10},
         clear=True
@@ -728,7 +736,7 @@ class TestAccountsAPI(CacheIsolationTestCase, UserAPITestCase):
             )
         )
 
-    @patch('openedx.core.djangoapps.user_api.accounts.serializers.AccountUserSerializer.save')
+    @mock.patch('openedx.core.djangoapps.user_api.accounts.serializers.AccountUserSerializer.save')
     def test_patch_serializer_save_fails(self, serializer_save):
         """
         Test that AccountUpdateErrors are passed through to the response.
@@ -822,7 +830,7 @@ class TestAccountAPITransactions(TransactionTestCase):
         self.user = UserFactory.create(password=TEST_PASSWORD)
         self.url = reverse("accounts_api", kwargs={'username': self.user.username})
 
-    @patch('student.views.do_email_change_request')
+    @mock.patch('student.views.do_email_change_request')
     def test_update_account_settings_rollback(self, mock_email_change):
         """
         Verify that updating account settings is transactional when a failure happens.
@@ -1210,7 +1218,7 @@ class TestAccountRetireMailings(RetirementTestCase):
         """
         headers = self.build_jwt_headers(self.test_superuser)
 
-        mock_handler = MagicMock()
+        mock_handler = mock.MagicMock()
         mock_handler.side_effect = Exception("Tango")
 
         try:
@@ -1600,6 +1608,9 @@ class TestAccountRetirementPost(RetirementTestCase):
             social_link='www.facebook.com'
         ).save()
 
+        self.cache_key = UserProfile.country_cache_key_name(self.test_user.id)
+        cache.set(self.cache_key, 'Timor-leste')
+
         self.test_superuser = SuperuserFactory()
         self.headers = self.build_jwt_headers(self.test_superuser)
         self.headers['content_type'] = "application/merge-patch+json"
@@ -1609,11 +1620,9 @@ class TestAccountRetirementPost(RetirementTestCase):
         """
         Helper function for making a request to the retire subscriptions endpoint, and asserting the status.
         """
-        if 'username' not in data:
-            data['username'] = self.test_user.username
-
         response = self.client.post(self.url, json.dumps(data), **self.headers)
         self.assertEqual(response.status_code, expected_status)
+        return response
 
     def test_user_profile_pii_has_expected_values(self):
         expected_user_profile_pii = {
@@ -1629,9 +1638,69 @@ class TestAccountRetirementPost(RetirementTestCase):
         }
         self.assertEqual(expected_user_profile_pii, USER_PROFILE_PII)
 
-    # def test_retire_user(self):
-    #     data = {'username': self.test_user.username}
-    #     self.post_and_assert_status(data)
+    def test_retire_user_where_user_does_not_exist(self):
+        path = 'openedx.core.djangoapps.user_api.accounts.views.get_retired_username_by_username'
+        with mock.patch(path) as mock_retired_username:
+            data = {'username': 'not_a_user'}
+            response = self.post_and_assert_status(data, status.HTTP_404_NOT_FOUND)
+            self.assertFalse(mock_retired_username.called)
+            self.assertFalse(response.content)
+
+    def test_retire_user_server_error_is_raised(self):
+        path = 'openedx.core.djangoapps.user_api.accounts.views.get_retired_username_by_username'
+        with mock.patch(path, side_effect=Exception('Unexpected Exception')) as mock_retired_username:
+            data = {'username': self.test_user.username}
+            response = self.post_and_assert_status(data, status.HTTP_500_INTERNAL_SERVER_ERROR)
+            self.assertEqual('Unexpected Exception', text_type(response.json()))
+
+    def test_retire_user_where_user_already_retired(self):
+        path = 'openedx.core.djangoapps.user_api.accounts.views.is_username_retired'
+        with mock.patch(path, return_value=True) as mock_is_username_retired:
+            data = {'username': self.test_user.username}
+            response = self.post_and_assert_status(data, status.HTTP_404_NOT_FOUND)
+            self.assertFalse(response.content)
+
+    def test_retire_user_where_username_not_provided(self):
+        response = self.post_and_assert_status({}, status.HTTP_404_NOT_FOUND)
+        expected_response_message = {'message': text_type('The user was not specified.')}
+        self.assertEqual(expected_response_message, response.json())
+
+    @mock.patch('openedx.core.djangoapps.user_api.accounts.views.get_profile_image_names')
+    @mock.patch('openedx.core.djangoapps.user_api.accounts.views.remove_profile_images')
+    def test_retire_user(self, mock_remove_profile_images, mock_get_profile_image_names):
+        registration = RegistrationFactory.create(user=self.test_user)
+        original_username = self.test_user.username
+
+        data = {'username': original_username}
+        self.post_and_assert_status(data)
+
+        self.test_user.refresh_from_db()
+        self.test_user.profile.refresh_from_db()
+
+        self.assertFalse(Registration.objects.filter(user=self.test_user).exists())
+        expected_user_values = {
+            'first_name': '',
+            'last_name': '',
+            'is_active': False,
+            'username': get_retired_username_by_username(original_username),
+        }
+        for field, expected_value in expected_user_values.iteritems():
+            self.assertEqual(expected_value, getattr(self.test_user, field))
+
+        for field, expected_value in USER_PROFILE_PII.iteritems():
+            self.assertEqual(expected_value, getattr(self.test_user.profile, field))
+
+        self.assertIsNone(self.test_user.profile.profile_image_uploaded_at)
+        mock_get_profile_image_names.assert_called_once_with(original_username)
+        mock_remove_profile_images.assert_called_once_with(
+            mock_get_profile_image_names.return_value
+        )
+
+        self.assertFalse(
+            SocialLink.objects.filter(user_profile=self.test_user.profile).exists()
+        )
+
+        self.assertIsNone(cache.get(self.cache_key))
 
     def test_deletes_pii_from_user_profile(self):
         for model_field, value_to_assign in USER_PROFILE_PII.iteritems():
@@ -1644,7 +1713,7 @@ class TestAccountRetirementPost(RetirementTestCase):
         AccountRetirementView.clear_pii_from_userprofile(self.test_user)
 
         for model_field, value_to_assign in USER_PROFILE_PII.iteritems():
-            self.assertEqual(value_to_assign, getattr(self.test_user, model_field))
+            self.assertEqual(value_to_assign, getattr(self.test_user.profile, model_field))
 
         social_links = SocialLink.objects.filter(
             user_profile=self.test_user.profile
@@ -1660,6 +1729,7 @@ class TestAccountRetirementPost(RetirementTestCase):
         self.test_user.profile.profile_image_uploaded_at = test_datetime
 
         AccountRetirementView.delete_users_profile_images(self.test_user)
+
         self.test_user.profile.refresh_from_db()
 
         self.assertIsNone(self.test_user.profile.profile_image_uploaded_at)
@@ -1669,7 +1739,5 @@ class TestAccountRetirementPost(RetirementTestCase):
         )
 
     def test_can_delete_user_profiles_country_cache(self):
-        cache_key = UserProfile.country_cache_key_name(self.test_user.id)
-        cache.set(cache_key, 'Timor-leste')
         AccountRetirementView.delete_users_country_cache(self.test_user)
-        self.assertIsNone(cache.get(cache_key))
+        self.assertIsNone(cache.get(self.cache_key))

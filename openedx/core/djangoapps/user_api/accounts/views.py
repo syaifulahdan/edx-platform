@@ -30,6 +30,7 @@ from openedx.core.lib.api.authentication import (
 )
 from openedx.core.lib.api.parsers import MergePatchParser
 from student.models import (
+    Registration,
     User,
     UserProfile,
     get_retired_email_by_email,
@@ -532,23 +533,18 @@ class AccountRetirementView(ViewSet):
             user = user_model.objects.get(username=username)
 
             with transaction.atomic():
-                #1, 2, 10
-                user.username = get_retired_username_by_username(user.username)
+                self.clear_pii_from_userprofile(user)
+                Registration.objects.filter(user=user).delete()
+                self.delete_users_profile_images(user)
+                self.delete_users_country_cache(user)
+                # TODO: Password Reset links
+                # TODO: Enterprise Data Deletion
+                # TODO: Delete OAuth2 records
                 user.first_name = ''
                 user.last_name = ''
                 user.is_active = False
-                #3 and 7
-                self.clear_pii_from_userprofile(user)
-                #4 TODO
-                #5 TODO
-                #6
-                self.delete_users_profile_images(user)
-                #8 TODO: 
-                self.delete_users_country_cache(user)
-
-
-
-                # user.save()
+                user.username = get_retired_username_by_username(user.username)
+                user.save()
         except user_model.DoesNotExist:
             return Response(status=status.HTTP_404_NOT_FOUND)
         except Exception as exc:  # pylint: disable=broad-except
@@ -559,10 +555,10 @@ class AccountRetirementView(ViewSet):
     @staticmethod
     def clear_pii_from_userprofile(user):
         for model_field, value_to_assign in USER_PROFILE_PII.iteritems():
-            setattr(user, model_field, value_to_assign)
+            setattr(user.profile, model_field, value_to_assign)
 
+        user.profile.save()
         user.profile.social_links.all().delete()
-        #user.profile.save()
 
     @staticmethod
     def delete_users_profile_images(user):
