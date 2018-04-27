@@ -8,10 +8,15 @@ import datetime
 from functools import wraps
 import logging
 
+from consent.models import DataSharingConsent
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.db import transaction
 from edx_rest_framework_extensions.authentication import JwtAuthentication
+from enterprise.models import EnterpriseCustomerUser, EnterpriseCourseEnrollment
+from integrated_channels.sap_success_factors.models import (
+    SapSuccessFactorsLearnerDataTransmissionAudit
+)
 from rest_framework import permissions
 from rest_framework import status
 from rest_framework.response import Response
@@ -540,6 +545,7 @@ class AccountRetirementView(ViewSet):
 
                 # TODO: Password Reset links - https://openedx.atlassian.net/browse/PLAT-2104
                 # TODO: Enterprise Data Deletion
+                self.retire_users_data_sharing_consent(username)
                 # TODO: Delete OAuth2 records - https://openedx.atlassian.net/browse/EDUCATOR-2703
                 user.first_name = ''
                 user.last_name = ''
@@ -552,6 +558,14 @@ class AccountRetirementView(ViewSet):
             return Response(text_type(exc), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @staticmethod
+    def retire_users_data_sharing_consent(username):
+        DataSharingConsent.objects.filter(
+            username=username
+        ).update(
+            username=get_retired_username_by_username(username)
+        )
     
     @staticmethod
     def clear_pii_from_userprofile(user):
@@ -571,3 +585,14 @@ class AccountRetirementView(ViewSet):
     def delete_users_country_cache(user):
         cache_key = UserProfile.country_cache_key_name(user.id)
         cache.delete(cache_key)
+
+    @staticmethod
+    def retire_sapsf_data_transmission(user):
+        for ent_user in EnterpriseCustomerUser.objects.filter(user_id=user.id):
+            for enrollment in EnterpriseCourseEnrollment.objects.filter(
+                enterprise_customer_user=ent_user
+            ):
+            audits = SapSuccessFactorsLearnerDataTransmissionAudit.objects.filter(
+                enterprise_course_enrollment_id=enrollment.id
+            )
+            audits.update(sapsf_user_id='')

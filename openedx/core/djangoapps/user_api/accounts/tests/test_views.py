@@ -8,6 +8,7 @@ import hashlib
 import json
 import unittest
 
+from consent.models import DataSharingConsent
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.cache import cache
@@ -15,6 +16,7 @@ from django.core.urlresolvers import reverse
 from django.test import TestCase
 from django.test.testcases import TransactionTestCase
 from django.test.utils import override_settings
+from enterprise.models import EnterpriseCustomer
 import mock
 from nose.plugins.attrib import attr
 from pytz import UTC
@@ -26,6 +28,7 @@ import pytest
 import pytz
 from six import text_type
 
+from openedx.core.djangoapps.site_configuration.tests.factories import SiteFactory
 from openedx.core.djangoapps.user_api.accounts import ACCOUNT_VISIBILITY_PREF_KEY
 from openedx.core.djangoapps.user_api.accounts.signals import USER_RETIRE_MAILINGS
 from openedx.core.djangoapps.user_api.models import RetirementState, UserRetirementStatus, UserPreference, UserOrgTag
@@ -1608,6 +1611,15 @@ class TestAccountRetirementPost(RetirementTestCase):
             social_link='www.facebook.com'
         ).save()
 
+        self.enterprise_customer = EnterpriseCustomer.objects.create(
+            name='test_enterprise_customer',
+            site=SiteFactory.create()
+        )
+        self.consent = DataSharingConsent.objects.create(
+            username=self.test_user.username,
+            enterprise_customer=self.enterprise_customer,
+        )
+
         self.cache_key = UserProfile.country_cache_key_name(self.test_user.id)
         cache.set(self.cache_key, 'Timor-leste')
 
@@ -1702,6 +1714,11 @@ class TestAccountRetirementPost(RetirementTestCase):
 
         self.assertIsNone(cache.get(self.cache_key))
 
+        test_users_data_sharing_consent = DataSharingConsent.objects.filter(
+            username=self.test_user.username
+        )
+        self.assertFalse(test_users_data_sharing_consent.exists())
+
     def test_deletes_pii_from_user_profile(self):
         for model_field, value_to_assign in USER_PROFILE_PII.iteritems():
             if value_to_assign == '':
@@ -1741,3 +1758,10 @@ class TestAccountRetirementPost(RetirementTestCase):
     def test_can_delete_user_profiles_country_cache(self):
         AccountRetirementView.delete_users_country_cache(self.test_user)
         self.assertIsNone(cache.get(self.cache_key))
+
+    def test_can_retire_users_datasharingconsent(self):
+        AccountRetirementView.retire_users_data_sharing_consent(self.test_user.username)
+        test_users_data_sharing_consent = DataSharingConsent.objects.filter(
+            username=self.test_user.username
+        )
+        self.assertFalse(test_users_data_sharing_consent.exists())
