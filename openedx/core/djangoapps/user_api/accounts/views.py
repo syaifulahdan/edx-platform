@@ -537,9 +537,10 @@ class AccountRetirementView(ViewSet):
                 Registration.objects.filter(user=user).delete()
                 self.delete_users_profile_images(user)
                 self.delete_users_country_cache(user)
-                # TODO: Password Reset links
+
+                # TODO: Password Reset links - https://openedx.atlassian.net/browse/PLAT-2104
                 # TODO: Enterprise Data Deletion
-                # TODO: Delete OAuth2 records
+                # TODO: Delete OAuth2 records - https://openedx.atlassian.net/browse/EDUCATOR-2703
                 user.first_name = ''
                 user.last_name = ''
                 user.is_active = False
