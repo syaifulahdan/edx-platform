@@ -9,9 +9,12 @@ from django.conf import settings
 from django.contrib.auth.models import Group
 from django.utils.translation import ugettext as _
 
-from openedx.core.djangoapps.password_policy.constants import PASSWORD_POLICY_COMPLIANT_USERS_GROUP_NAME
 from util.date_utils import strftime_localized, DEFAULT_SHORT_DATE_FORMAT
 from util.password_policy_validators import validate_password
+
+
+# The name of the Group used to track the users that are known to be compliant with password policy requirements.
+PASSWORD_POLICY_COMPLIANT_USERS_GROUP_NAME = 'password_policy.compliant.users'
 
 
 class NonCompliantPasswordException(Exception):
@@ -113,7 +116,7 @@ def _check_user_compliance(user, password):
         pass
 
     # Check if the user's password meets current policy requirements.
-    try
+    try:
         validate_password(password, user=user)
         is_compliant = True
     except:
