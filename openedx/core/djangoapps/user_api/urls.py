@@ -30,11 +30,6 @@ ACCOUNT_DETAIL = AccountViewSet.as_view({
     'patch': 'partial_update',
 })
 
-RETIREMENT_QUEUE = AccountRetirementView.as_view({
-    'get': 'retirement_queue',
-    'post': 'create',
-})
-
 RETIREMENT_RETRIEVE = AccountRetirementView.as_view({
     'get': 'retrieve'
 })
@@ -89,11 +84,6 @@ urlpatterns = [
         r'^v1/accounts/{}/retirement_status/$'.format(settings.USERNAME_PATTERN),
         RETIREMENT_RETRIEVE,
         name='accounts_retirement_retrieve'
-    ),
-    url(
-        r'^v1/accounts/retirement_queue/$',
-        RETIREMENT_QUEUE,
-        name='accounts_retirement_queue'
     ),
     url(
         r'^v1/accounts/update_retirement_status/$',
