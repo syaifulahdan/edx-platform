@@ -1,23 +1,26 @@
+from django.contrib import messages
 from django.contrib.admin.forms import AdminAuthenticationForm
 from django.forms import ValidationError
-from django.utils.translation import ugettext as _
 
-from openedx.core.djangoapps.password_policy.utils import (
-    NonCompliantPasswordException,
-    check_password_policy_compliance
-)
+from openedx.core.djangoapps.password_policy import compliance as password_policy_compliance
 
 
 class PasswordPolicyAwareAdminAuthForm(AdminAuthenticationForm):
+    """
+    Custom AdminAuthenticationForm that can enforce password policy rules on login.
+    """
+
     def clean(self):
         cleaned_data = super(PasswordPolicyAwareAdminAuthForm, self).clean()
 
-        try:
-            check_password_policy_compliance(self.user_cache, cleaned_data['password'], self.request)
-        except NonCompliantPasswordException:
-            raise ValidationError(_(
-                'Your password is not compliant with the current password policy. You must reset your password'
-                ' before you can log in again.'
-            ))
+        if password_policy_compliance.should_enforce_compliance_on_login():
+            try:
+                password_policy_compliance.enforce_compliance_on_login(self.user_cache, cleaned_data['password'])
+            except: password_policy_compliance.NonCompliantPasswordWarning as e:
+                # Allow login, but warn the user that they will be required to reset their password soon.
+                messages.warning(self.request, e.message)
+            except: password_policy_compliance.NonCompliantPasswordException as e:
+                # Prevent the login attempt.
+                raise ValidationError(e.message)
 
         return cleaned_data

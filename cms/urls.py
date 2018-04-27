@@ -10,6 +10,7 @@ import openedx.core.djangoapps.common_views.xblock
 import openedx.core.djangoapps.debug.views
 import openedx.core.djangoapps.external_auth.views
 import openedx.core.djangoapps.lang_pref.views
+from openedx.core.djangoapps.password_policy import compliance as password_policy_compliance
 
 from ratelimitbackend import admin
 
@@ -17,7 +18,7 @@ django_autodiscover()
 admin.site.site_header = _('Studio Administration')
 admin.site.site_title = admin.site.site_header
 
-if settings.PASSWORD_POLICY_COMPLIANCE_ROLLOUT_CONFIG.get('ENABLE_COMPLIANCE_CHECKING', False):
+if password_policy_compliance.should_enforce_compliance_on_login():
     from openedx.core.djangoapps.password_policy.forms import PasswordPolicyAwareAdminAuthForm
     admin.site.login_form = PasswordPolicyAwareAdminAuthForm
 

@@ -1,8 +1,8 @@
 def plugin_settings(settings):
     # Settings for managing the rollout of password policy compliance enforcement.
     settings.PASSWORD_POLICY_COMPLIANCE_ROLLOUT_CONFIG = {
-        # Global switch to enable/disable password policy compliance checking on login.
-        'ENABLE_COMPLIANCE_CHECKING': False,
+        # Global switch to enable/disable password policy compliance enforcement on login.
+        'ENFORCE_COMPLIANCE_ON_LOGIN': False,
 
         # The date that staff users (users with is_staff permissions) will be required to be compliant with
         # current password policy requirements. After this date, non-compliant users will be forced to reset their
@@ -29,5 +29,5 @@ def plugin_settings(settings):
 
         # The number of days before the compliance deadline that we will display a warning to non-compliant users that
         # they will be forced to reset their password.
-        'DAYS_BEFORE_DEADLINE_TO_SHOW_WARNING': 30
+        'WARNING_PERIOD_DAYS': 30
     }

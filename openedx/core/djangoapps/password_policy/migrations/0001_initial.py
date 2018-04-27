@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 
 from django.db import migrations
 
-from openedx.core.djangoapps.password_policy.constants import PASSWORD_POLICY_COMPLIANT_USERS_GROUP_NAME
+from openedx.core.djangoapps.password_policy.compliance import PASSWORD_POLICY_COMPLIANT_USERS_GROUP_NAME
 
 
 def up(apps, schema_editor):
