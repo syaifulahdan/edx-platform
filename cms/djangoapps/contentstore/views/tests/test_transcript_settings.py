@@ -298,15 +298,6 @@ class TranscriptUploadTest(CourseTestCase):
         response = self.client.get(self.view_url, content_type='application/json')
         self.assertEqual(response.status_code, 405)
 
-    def test_404_with_feature_disabled(self):
-        """
-        Verify that 404 is returned if the corresponding feature is disabled.
-        """
-        with patch('openedx.core.djangoapps.video_config.models.VideoTranscriptEnabledFlag.feature_enabled') as feature:
-            feature.return_value = False
-            response = self.client.post(self.view_url, content_type='application/json')
-            self.assertEqual(response.status_code, 404)
-
     @patch('contentstore.views.transcript_settings.create_or_update_video_transcript')
     @patch('contentstore.views.transcript_settings.get_available_transcript_languages', Mock(return_value=['en']))
     def test_transcript_upload_handler(self, mock_create_or_update_video_transcript):
@@ -449,11 +440,7 @@ class TranscriptUploadTest(CourseTestCase):
 
 
 @ddt.ddt
-@patch(
-    'openedx.core.djangoapps.video_config.models.VideoTranscriptEnabledFlag.feature_enabled',
-    Mock(return_value=True)
-)
-class TranscriptUploadTest(CourseTestCase):
+class TranscriptDeleteTest(CourseTestCase):
     """
     Tests for transcript deletion handler.
     """
