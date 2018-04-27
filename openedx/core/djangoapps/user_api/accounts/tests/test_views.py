@@ -983,28 +983,6 @@ class RetirementTestCase(TestCase):
         }
         return headers
 
-    def assert_status_and_user_data(self, expected_data, expected_status=status.HTTP_200_OK, username_to_find=None):
-        """
-        Helper function for making a request to the retire subscriptions endpoint, asserting the status,
-        and optionally asserting the expected data.
-        """
-        if username_to_find is not None:
-            self.url = reverse('accounts_retirement_retrieve', kwargs={'username': username_to_find})
-
-        response = self.client.get(self.url, **self.headers)
-        self.assertEqual(response.status_code, expected_status)
-
-        if expected_data is not None:
-            response_data = response.json()
-
-            # These won't match up due to serialization, but they're inherited fields tested elsewhere
-            for data in (expected_data, response_data):
-                del data['created']
-                del data['modified']
-
-            self.assertDictEqual(response_data, expected_data)
-            return response_data
-
     def _create_retirement(self, state, create_datetime=None):
         """
         Helper method to create a RetirementStatus with useful defaults
@@ -1398,6 +1376,28 @@ class TestAccountRetirementRetrieve(RetirementTestCase):
         self.headers = self.build_jwt_headers(self.test_superuser)
         self.maxDiff = None
 
+    def assert_status_and_user_data(self, expected_data, expected_status=status.HTTP_200_OK, username_to_find=None):
+        """
+        Helper function for making a request to the retire subscriptions endpoint, asserting the status,
+        and optionally asserting the expected data.
+        """
+        if username_to_find is not None:
+            self.url = reverse('accounts_retirement_retrieve', kwargs={'username': username_to_find})
+
+        response = self.client.get(self.url, **self.headers)
+        self.assertEqual(response.status_code, expected_status)
+
+        if expected_data is not None:
+            response_data = response.json()
+
+            # These won't match up due to serialization, but they're inherited fields tested elsewhere
+            for data in (expected_data, response_data):
+                del data['created']
+                del data['modified']
+
+            self.assertDictEqual(response_data, expected_data)
+            return response_data
+
     def test_no_retirement(self):
         """
         Confirm we get a 404 if a retirement for the user can be found
@@ -1576,52 +1576,3 @@ class TestAccountRetirementUpdate(RetirementTestCase):
         # Should already be in 'PENDING'
         data = {'new_state': 'PENDING', 'response': 'this should fail'}
         self.update_and_assert_status(data, status.HTTP_400_BAD_REQUEST)
-
-
-@unittest.skipUnless(settings.ROOT_URLCONF == 'lms.urls', 'Account APIs are only supported in LMS')
-class TestAccountRetirementCreate(RetirementTestCase):
-    """
-    Tests the account retirement creation endpoint.
-    """
-    def setUp(self):
-        super(TestAccountRetirementCreate, self).setUp()
-        self.test_user = UserFactory()
-        self.test_superuser = SuperuserFactory()
-        self.url = reverse('accounts_retirement_queue')
-        self.headers = self.build_jwt_headers(self.test_superuser)
-        self.maxDiff = None
-
-    def test_no_retirement(self):
-        """
-        Confirm we get a 400 if a retirement for the user can be found
-        """
-        self.assert_status_and_user_data(None, status.HTTP_400_BAD_REQUEST)
-
-    def test_retirement(self):
-        """
-        Create a bunch of retirements and confirm we get back the correct data for each
-        """
-        retirements = []
-
-        for state in RetirementState.objects.all():
-            retirements.append(self._create_retirement(state))
-
-        for retirement in retirements:
-            values = self._retirement_to_dict(retirement)
-            self.assert_status_and_user_data(values, username_to_find=values['user']['username'])
-
-    def test_error_if_not_logged_in_user(self):
-        """
-        Simulate retrieving a retirement by the old username, after the name has been changed to the hashed one
-        """
-        pending_state = RetirementState.objects.get(state_name='PENDING')
-        retirement = self._create_retirement(pending_state)
-        original_username = retirement.user.username
-
-        hashed_username = get_retired_username_by_username(original_username)
-
-        retirement.user.username = hashed_username
-        retirement.user.save()
-
-        values = self._retirement_to_dict(retirement)
-        self.assert_status_and_user_data(values, username_to_find=original_username)

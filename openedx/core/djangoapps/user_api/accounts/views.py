@@ -7,7 +7,6 @@ https://openedx.atlassian.net/wiki/display/TNL/User+API
 import datetime
 
 import pytz
-from django.conf import settings
 from django.contrib.auth import get_user_model, authenticate
 from django.db import transaction
 from django.utils.translation import ugettext as _
