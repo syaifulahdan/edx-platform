@@ -165,7 +165,7 @@ pipeline {
                 CODE_COV_TOKEN = credentials('CODE_COV_TOKEN')
                 TARGET_BRANCH = "origin/master"
                 CI_BRANCH = "${ghprbSourceBranch}"
-                SUBSET_BRANCH = "null" // Keep this variable until we can remove the $SUBSET_JOB path from .coveragerc
+                SUBSET_JOB = "null" // Keep this variable until we can remove the $SUBSET_JOB path from .coveragerc
             }
             steps {
                 sshagent(credentials: ['jenkins-worker'], ignoreMissing: true) {
@@ -185,8 +185,8 @@ pipeline {
             }
             post {
                 always {
-                    // publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: true, reportDir: 'reports', reportFiles: 'diff_coverage_combined.html', reportName: 'Diff Coverage Report'])
-                    publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: true, reportDir: 'reports/cover', reportFiles: 'index.html', reportName: 'Coverage.py Report'])
+                    publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: true, reportDir: 'reports', reportFiles: 'diff_coverage_combined.html', reportName: 'Diff Coverage Report'])
+                    // publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: true, reportDir: 'reports/cover', reportFiles: 'index.html', reportName: 'Coverage.py Report'])
                 }
             }
         }
