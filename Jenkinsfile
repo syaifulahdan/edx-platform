@@ -185,7 +185,7 @@ pipeline {
             }
             post {
                 always {
-                    publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: true, reportDir: 'reports', reportFiles: 'diff_coverage_combined.html', reportName: 'Diff Coverage Report'])
+                    // publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: true, reportDir: 'reports', reportFiles: 'diff_coverage_combined.html', reportName: 'Diff Coverage Report'])
                     publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: true, reportDir: 'reports/cover', reportFiles: 'index.html', reportName: 'Coverage.py Report'])
                 }
             }
