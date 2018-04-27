@@ -197,7 +197,7 @@ def _check_forced_password_reset(user):
 def _enforce_password_policy_compliance(request, user):
     try:
         password_policy_compliance.enforce_compliance_on_login(user, request.POST.get('password'))
-    except password_policy_compliance.NonCompliancePasswordWarning as e:
+    except password_policy_compliance.NonCompliantPasswordWarning as e:
         # Allow login, but warn the user that they will be required to reset their password soon.
         PageLevelMessages.register_warning_message(request, e.message)
     except password_policy_compliance.NonCompliantPasswordException as e:
